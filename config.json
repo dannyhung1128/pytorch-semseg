@@ -36,6 +36,6 @@
   
   "cityscapes":
   {
-    "data_path": "/home/meet/datasets/cityscapes/"
+    "data_path": "/home/dannyhung/LightNet/datasets/cityscapes"
   }
 }

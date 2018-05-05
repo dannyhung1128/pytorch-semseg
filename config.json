@@ -36,6 +36,6 @@
   
   "cityscapes":
   {
-    "data_path": "/home/dannyhung/LightNet/datasets/cityscapes"
+    "data_path": "/Users/dannyhung/Documents/selfDriving/pytorch-semseg/cityscapes/"
   }
 }

@@ -41,7 +41,7 @@ class cityscapesLoader(data.Dataset):
               [  0,   0, 230],
               [119,  11,  32]]
 
-    label_colours = dict(zip(range(19), colors))
+    label_colours = dict(zip(range(2), colors))
 
     mean_rgb = {'pascal': [103.939, 116.779, 123.68], 'cityscapes': [73.15835921, 82.90891754, 72.39239876]} # pascal mean for PSPNet and ICNet pre-trained model
 
@@ -60,7 +60,7 @@ class cityscapesLoader(data.Dataset):
         self.is_transform = is_transform
         self.augmentations = augmentations
         self.img_norm = img_norm
-        self.n_classes = 19
+        self.n_classes = 2
         self.img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
         self.mean = np.array(self.mean_rgb[version])
         self.files = {}
@@ -70,15 +70,18 @@ class cityscapesLoader(data.Dataset):
 
         self.files[split] = recursive_glob(rootdir=self.images_base, suffix='.png')
     
-        self.void_classes = [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30, -1]
-        self.valid_classes = [7, 8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33]
-        self.class_names = ['unlabelled', 'road', 'sidewalk', 'building', 'wall', 'fence',\
-                            'pole', 'traffic_light', 'traffic_sign', 'vegetation', 'terrain',\
-                            'sky', 'person', 'rider', 'car', 'truck', 'bus', 'train', \
-                            'motorcycle', 'bicycle']
+        self.void_classes = [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30, -1, \
+                             8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 31, 32, 33]
+                        
+        self.valid_classes = [7, 26] # 26, 27, 28 = vehicle
+        self.class_names = ['road', 'vehicle']
+        #self.class_names = ['unlabelled', 'road', 'sidewalk', 'building', 'wall', 'fence',\
+        #                    'pole', 'traffic_light', 'traffic_sign', 'vegetation', 'terrain',\
+        #                    'sky', 'person', 'rider', 'car', 'truck', 'bus', 'train', \
+        #                    'motorcycle', 'bicycle']
 
         self.ignore_index = 250
-        self.class_map = dict(zip(self.valid_classes, range(19))) 
+        self.class_map = dict(zip(self.valid_classes, range(2))) 
 
         if not self.files[split]:
             raise Exception("No files for split=[%s] found in %s" % (split, self.images_base))
@@ -94,6 +97,7 @@ class cityscapesLoader(data.Dataset):
 
         :param index:
         """
+
         img_path = self.files[self.split][index].rstrip()
         lbl_path = os.path.join(self.annotations_base,
                                 img_path.split(os.sep)[-2], 
@@ -104,7 +108,6 @@ class cityscapesLoader(data.Dataset):
 
         lbl = m.imread(lbl_path)
         lbl = self.encode_segmap(np.array(lbl, dtype=np.uint8))
-        
         if self.augmentations is not None:
             img, lbl = self.augmentations(img, lbl)
         
@@ -164,6 +167,8 @@ class cityscapesLoader(data.Dataset):
 
     def encode_segmap(self, mask):
         #Put all void classes to zero
+        mask[mask == 27] = 26 # truck to car
+        mask[mask == 28] = 26 # bus to car
         for _voidc in self.void_classes:
             mask[mask==_voidc] = self.ignore_index
         for _validc in self.valid_classes:

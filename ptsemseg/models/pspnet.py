@@ -19,7 +19,7 @@ pspnet_specs = {
 
     'cityscapes': 
     {
-         'n_classes': 19,
+         'n_classes': 2,
          'input_size': (713, 713),
          'block_config': [3, 4, 23, 3],
     },
@@ -49,9 +49,9 @@ class pspnet(nn.Module):
     """
 
     def __init__(self, 
-                 n_classes=21, 
+                 n_classes=2, 
                  block_config=[3, 4, 23, 3], 
-                 input_size=(473,473), 
+                 input_size=(713, 713), 
                  version=None):
 
         super(pspnet, self).__init__()

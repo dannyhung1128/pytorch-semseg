@@ -1,4 +1,5 @@
 import sys, os
+import time
 import torch
 import visdom
 import argparse
@@ -49,7 +50,9 @@ def train(args):
 
     # Setup Model
     model = get_model(args.arch, n_classes)
-    
+    caffemodel_dir_path = '/home/dannyhung/pytorch-semseg/'
+    model.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_cityscapes.caffemodel'))
+        
     model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
     model.cuda()
     
@@ -80,17 +83,22 @@ def train(args):
     for epoch in range(args.n_epoch):
         model.train()
         for i, (images, labels) in enumerate(trainloader):
+            if len(images) == 1:
+                images = torch.cat((images, images), 0)
+                labels = torch.cat((labels, labels), 0)
+            start = time.time()
             images = Variable(images.cuda())
             labels = Variable(labels.cuda())
-
+            
             optimizer.zero_grad()
             outputs = model(images)
-
+            forward_time = time.time() - start
+            
+            start = time.time()
             loss = loss_fn(input=outputs, target=labels)
-
             loss.backward()
             optimizer.step()
-
+            backprop_time = time.time() - start
             if args.visdom:
                 vis.line(
                     X=torch.ones((1, 1)).cpu() * i,
@@ -99,7 +107,8 @@ def train(args):
                     update='append')
 
             if (i+1) % 20 == 0:
-                print("Epoch [%d/%d] Loss: %.4f" % (epoch+1, args.n_epoch, loss.data[0]))
+                print("Epoch [%d/%d], Iter [%i/%i], Loss: %.4f, Forward time: %.4f, Backprop time: %.4f" % \
+                        (epoch+1, args.n_epoch, i, len(trainloader), loss.data[0], forward_time, backprop_time))
 
         model.eval()
         for i_val, (images_val, labels_val) in tqdm(enumerate(valloader)):

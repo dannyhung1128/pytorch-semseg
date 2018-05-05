@@ -101,3 +101,5 @@ ENV/
 # Danny Local laptop
 config.json
 cityscapes/
+carla/
+pspnet101_cityscapes.caffemodel

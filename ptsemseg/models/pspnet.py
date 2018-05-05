@@ -1,3 +1,6 @@
+import os
+import sys
+sys.path.insert(0, os.getcwd())
 import torch
 import numpy as np
 import torch.nn as nn
@@ -8,6 +11,7 @@ from torch.autograd import Variable
 from ptsemseg import caffe_pb2
 from ptsemseg.models.utils import *
 from ptsemseg.loss import *
+from ptsemseg.utils import convert_state_dict
 
 pspnet_specs = {
     'pascalvoc': 
@@ -19,7 +23,7 @@ pspnet_specs = {
 
     'cityscapes': 
     {
-         'n_classes': 2,
+         'n_classes': 3,
          'input_size': (713, 713),
          'block_config': [3, 4, 23, 3],
     },
@@ -49,7 +53,7 @@ class pspnet(nn.Module):
     """
 
     def __init__(self, 
-                 n_classes=2, 
+                 n_classes=3, 
                  block_config=[3, 4, 23, 3], 
                  input_size=(713, 713), 
                  version=None):
@@ -266,8 +270,8 @@ class pspnet(nn.Module):
             _transfer_conv_bn(k, v)
 
         # Transfer weights for final non-bn conv layer
-        _transfer_conv('conv6', self.classification)
-        _transfer_conv('conv6_1', self.aux_cls)
+        #_transfer_conv('conv6', self.classification)
+        #_transfer_conv('conv6_1', self.aux_cls)
 
         # Transfer weights for all residual layers
         for k, v in residual_layers.items():
@@ -347,8 +351,12 @@ if __name__ == '__main__':
     psp = pspnet(version='cityscapes')
     
     # Just need to do this one time
-    caffemodel_dir_path = 'PATH_TO_PSPNET_DIR/evaluation/model'
-    psp.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_cityscapes.caffemodel'))
+    #caffemodel_dir_path = '/home/dannyhung/pytorch-semseg/'
+    #psp.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_cityscapes.caffemodel'))
+    model_path = 'pspnet_cityscapes_best_model.pkl'
+    state = convert_state_dict(torch.load(model_path)['model_state'])
+    psp.load_state_dict(state)
+    
     #psp.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet50_ADE20K.caffemodel'))
     #psp.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_VOC2012.caffemodel'))
     
@@ -358,22 +366,35 @@ if __name__ == '__main__':
     psp.cuda(cd)
     psp.eval()
 
-    dataset_root_dir = 'PATH_TO_CITYSCAPES_DIR'
+    dataset_root_dir = '/home/dannyhung/LightNet/datasets/cityscapes/'
     dst = cl(root=dataset_root_dir)
-    img = m.imread(os.path.join(dataset_root_dir, 'leftImg8bit/demoVideo/stuttgart_00/stuttgart_00_000000_000010_leftImg8bit.png'))
+    #img = m.imread(os.path.join(dataset_root_dir, 'leftImg8bit/train/aachen/aachen_000012_000019_leftImg8bit.png'))
+    img = m.imread('carla/leftImg8bit/train/135.png')
     m.imsave('cropped.png', img)
     orig_size = img.shape[:-1]
-    img = img.transpose(2, 0, 1)
+    img = m.imresize(img, (600, 800))
+    img = img[:, :, ::-1]
+    #img = img.transpose(2, 0, 1)
     img = img.astype(np.float64)
-    img -= np.array([123.68, 116.779, 103.939])[:, None, None]
-    img = np.copy(img[::-1, :, :])
+    img -= np.array([92.05991654, 84.79349942, 77.08157727])[None, None, :]
+    img /= 255.
+    #img = np.copy(img[::-1, :, :])
+    img = img.transpose(2, 0 ,1)
     img = torch.from_numpy(img).float() # convert to torch tensor
     img = img.unsqueeze(0)
 
     out = psp.tile_predict(img)
     pred = np.argmax(out, axis=1)[0]
+    from collections import Counter
+    print(pred.shape)
+    img = pred[:, :]
+    l = []
+    for i in img:
+        for j in i:
+            l.append(j)
+    print(Counter(l))
     decoded = dst.decode_segmap(pred)
-    m.imsave('cityscapes_sttutgart_tiled.png', decoded)
+    m.imsave('cityscapes_berlin_tiled.png', decoded)
     #m.imsave('cityscapes_sttutgart_tiled.png', pred) 
 
     checkpoints_dir_path = 'checkpoints'

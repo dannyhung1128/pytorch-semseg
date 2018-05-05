@@ -19,10 +19,17 @@ from ptsemseg.models import get_model
 from ptsemseg.loader import get_loader, get_data_path
 from ptsemseg.metrics import runningScore
 from ptsemseg.utils import convert_state_dict
-
+from collections import Counter
 torch.backends.cudnn.benchmark = True
 
 cudnn.benchmark = True
+def tolist(array):
+    array = array[0]
+    l = []
+    for i in range(len(array)):
+        for j in range(len(array[i])):
+            l.append(array[i][j])
+    return l
 
 def validate(args):
     model_file_name = os.path.split(args.model_path)[1]
@@ -67,7 +74,8 @@ def validate(args):
 
         #gt = labels.data.cpu().numpy()
         gt = labels.numpy()
-
+        print(gt.shape, pred.shape)
+        print(Counter(tolist(gt)), Counter(tolist(pred)))
         if args.measure_time:
             elapsed_time = timeit.default_timer() - start_time
             print('Inference time (iter {0:5d}): {1:3.5f} fps'.format(i+1, pred.shape[0]/elapsed_time))

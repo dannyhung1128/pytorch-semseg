@@ -56,7 +56,7 @@ def validate(args):
         images = Variable(images.cuda(), volatile=True)
         #labels = Variable(labels.cuda(), volatile=True)
 
-        if args.eval_flip:
+        if False:#args.eval_flip:
             outputs = model(images)
 
             # Flip images in numpy (not support in tensor)
@@ -74,8 +74,6 @@ def validate(args):
 
         #gt = labels.data.cpu().numpy()
         gt = labels.numpy()
-        print(gt.shape, pred.shape)
-        print(Counter(tolist(gt)), Counter(tolist(pred)))
         if args.measure_time:
             elapsed_time = timeit.default_timer() - start_time
             print('Inference time (iter {0:5d}): {1:3.5f} fps'.format(i+1, pred.shape[0]/elapsed_time))

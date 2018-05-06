@@ -103,3 +103,5 @@ config.json
 cityscapes/
 carla/
 pspnet101_cityscapes.caffemodel
+mask.npy
+test_video.mp4

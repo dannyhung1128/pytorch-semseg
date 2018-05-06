@@ -48,7 +48,7 @@ class carlaLoader(data.Dataset):
         self.class_names = ['road', 'vehicle', 'background']
         
         self.ignore_index = 250
-        self.class_map = dict(zip(self.valid_classes, [0, 50, 100])) 
+        self.class_map = dict(zip(self.valid_classes, range(3))) 
 
         if not self.files[split]:
             raise Exception("No files for split=[%s] found in %s" % (split, self.images_base))

@@ -17,6 +17,7 @@ from ptsemseg.loader import get_loader, get_data_path
 from ptsemseg.metrics import runningScore
 from ptsemseg.loss import *
 from ptsemseg.augmentations import *
+from ptsemseg.utils import convert_state_dict
 
 def train(args):
 
@@ -50,9 +51,12 @@ def train(args):
 
     # Setup Model
     model = get_model(args.arch, n_classes)
-    caffemodel_dir_path = '/home/dannyhung/pytorch-semseg/'
-    model.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_cityscapes.caffemodel'))
-        
+    #caffemodel_dir_path = '/home/dannyhung/pytorch-semseg/'
+    #model.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_cityscapes.caffemodel'))
+    model_path = 'pspnet_cityscapes_best_model.pkl'
+    state = convert_state_dict(torch.load(model_path)['model_state'])
+    model.load_state_dict(state)     
+   
     model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
     model.cuda()
     
@@ -130,7 +134,7 @@ def train(args):
             state = {'epoch': epoch+1,
                      'model_state': model.state_dict(),
                      'optimizer_state' : optimizer.state_dict(),}
-            torch.save(state, "{}_{}_best_model.pkl".format(args.arch, args.dataset))
+            torch.save(state, "{}_{}_{}_best_model.pkl".format(args.arch, args.dataset, str(epoch+1)))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Hyperparams')

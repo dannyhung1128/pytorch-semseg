@@ -34,6 +34,13 @@ pspnet_specs = {
          'input_size': (473, 473),
          'block_config': [3, 4, 6, 3],
     },
+
+    'carla':
+    {
+        'n_classes':3,
+        'input_size': (600, 800),
+        'block_config': [3, 4, 23, 3],
+    }
 }
 
 class pspnet(nn.Module):
@@ -353,10 +360,9 @@ if __name__ == '__main__':
     # Just need to do this one time
     #caffemodel_dir_path = '/home/dannyhung/pytorch-semseg/'
     #psp.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_cityscapes.caffemodel'))
-    model_path = 'pspnet_cityscapes_best_model.pkl'
+    model_path = 'pspnet_carla_10_best_model.pkl'
     state = convert_state_dict(torch.load(model_path)['model_state'])
     psp.load_state_dict(state)
-    
     #psp.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet50_ADE20K.caffemodel'))
     #psp.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_VOC2012.caffemodel'))
     
@@ -387,6 +393,8 @@ if __name__ == '__main__':
     pred = np.argmax(out, axis=1)[0]
     from collections import Counter
     print(pred.shape)
+    idx = np.load('mask.npy')
+    pred[490:][idx] = 2
     img = pred[:, :]
     l = []
     for i in img:

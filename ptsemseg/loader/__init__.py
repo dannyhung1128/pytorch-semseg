@@ -7,7 +7,7 @@ from ptsemseg.loader.mit_sceneparsing_benchmark_loader import MITSceneParsingBen
 from ptsemseg.loader.cityscapes_loader import cityscapesLoader
 from ptsemseg.loader.nyuv2_loader import NYUv2Loader
 from ptsemseg.loader.sunrgbd_loader import SUNRGBDLoader
-
+from ptsemseg.loader.carla_loader import carlaLoader
 
 def get_loader(name):
     """get_loader
@@ -22,6 +22,7 @@ def get_loader(name):
         'cityscapes': cityscapesLoader,
         'nyuv2': NYUv2Loader,
         'sunrgbd': SUNRGBDLoader,
+        'carla': carlaLoader,
     }[name]
 
 

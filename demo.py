@@ -42,7 +42,7 @@ video = skvideo.io.vread(file)
 answer_key = {}
 
 def encode(array):
-    pil_img = Image.fromarray(array)
+    pil_img = Image.fromarray(array.astype('uint8'))
     buff = BytesIO()
     pil_img.save(buff, format="PNG")
     return base64.b64encode(buff.getvalue()).decode("utf-8")
@@ -61,22 +61,25 @@ for rgb_frame in video:
     img = Variable(img.unsqueeze(0)).cuda()
 
     out = model(img)
-    pred = np.argmax(out, axis=1)[0]
-    
+    pred = out.data.max(1)[1].cpu().numpy()
     # Grab prediction
     #outputs = model(rgb_frame)
     #pred = outputs.data.max(1)[1].cpu().numpy()
     # Look for red cars :)
-    binary_car_result = pred.copy()
+    #binary_car_result = pred.copy()
+    #pred = np.random.random_integers(0, 2, size=(600,800))
     #binary_car_result[binary_car_result == 1] = -1
+    binary_car_result = pred.copy()
     binary_car_result[binary_car_result != 1] = 0
     #binary_car_result[binary_car_result == -1] = 1
+    binary_car_result = binary_car_result[0]
     # Look for road :)
     binary_road_result = pred.copy()
-    binary_road_result[binary_car_result == 0] = -1
-    binary_road_result[binary_car_result != -1] = 0
-    binary_road_result[binary_car_result == -1] = 1
-    
+    binary_road_result[binary_road_result == 0] = -1
+    binary_road_result[binary_road_result != -1] = 0
+    binary_road_result[binary_road_result == -1] = 1
+    binary_road_result = binary_road_result[0]
+    print((binary_road_result.shape))
     answer_key[frame] = [encode(binary_car_result), encode(binary_road_result)]
     duration = time.time() - start
     # Increment frame
@@ -84,5 +87,5 @@ for rgb_frame in video:
     print(frame, duration)
 
 # Print output in proper json format
-print (json.dumps(answer_key))
+print(json.dumps(answer_key))
 

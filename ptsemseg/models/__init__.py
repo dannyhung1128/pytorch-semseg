@@ -7,6 +7,9 @@ from ptsemseg.models.pspnet import *
 from ptsemseg.models.icnet import *
 from ptsemseg.models.linknet import *
 from ptsemseg.models.frrn import *
+from ptsemseg.models.deeplabv3plus import *
+from ptsemseg.models.resnet import *
+from ptsemseg.models.msc import *
 
 
 def get_model(name, n_classes, version=None):
@@ -39,7 +42,10 @@ def get_model(name, n_classes, version=None):
         model = model(n_classes=n_classes, with_bn=False, version=version)
     elif name == 'icnetBN':
         model = model(n_classes=n_classes, with_bn=True, version=version)
-
+    
+    elif name == 'deeplabv3plus':
+        return MSC(DeepLabV3Plus(n_classes=n_classes, n_blocks=[3, 4, 23, 3], pyramids=[6, 12, 18]))
+    
     else:
         model = model(n_classes=n_classes)
 
@@ -59,6 +65,7 @@ def _get_model_instance(name):
             'linknet': linknet,
             'frrnA': frrn,
             'frrnB': frrn,
+            'deeplabv3plus': deeplabv3plus,
         }[name]
     except:
         print('Model {} not available'.format(name))

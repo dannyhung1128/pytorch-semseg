@@ -62,7 +62,7 @@ class pspnet(nn.Module):
     def __init__(self, 
                  n_classes=3, 
                  block_config=[3, 4, 23, 3], 
-                 input_size=(713, 713), 
+                 input_size=(90, 200), 
                  version=None):
 
         super(pspnet, self).__init__()

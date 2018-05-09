@@ -371,8 +371,8 @@ class pyramidPooling(nn.Module):
 
     def forward(self, x):
         h, w = x.shape[2:]
-
-        if self.training or self.model_name != 'icnet': # general settings or pspnet
+        # else case doesn't work for icnet
+        if True: #self.training or self.model_name != 'icnet': # general settings or pspnet
             k_sizes = []
             strides = []
             for pool_size in self.pool_sizes:
@@ -396,7 +396,6 @@ class pyramidPooling(nn.Module):
             return torch.cat(output_slices, dim=1)
         else: # icnet: element-wise sum (including x)
             pp_sum = x
-
             for i, (module, pool_size) in enumerate(zip(self.path_module_list, self.pool_sizes)):
                 out = F.avg_pool2d(x, k_sizes[i], stride=strides[i], padding=0)
                 #out = F.adaptive_avg_pool2d(x, output_size=(pool_size, pool_size))
@@ -491,8 +490,7 @@ class cascadeFeatureFusion(nn.Module):
         self.high_proj_conv_bn = conv2DBatchNorm(high_in_channels, out_channels, 1, stride=1, padding=0, bias=bias, with_bn=with_bn)
 
     def forward(self, x_low, x_high):
-        x_low_upsampled = F.upsample(x_low, size=get_interp_size(x_low, z_factor=2), mode='bilinear')
-
+        x_low_upsampled = F.upsample(x_low, size=x_high.shape[2:], mode='bilinear') #size=get_interp_size(x_low, z_factor=2), mode='bilinear')
         low_cls = self.low_classifier_conv(x_low_upsampled)
 
         low_fm = self.low_dilated_conv_bn(x_low_upsampled)

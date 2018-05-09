@@ -12,8 +12,8 @@ from ptsemseg.loss import *
 icnet_specs = {
     'cityscapes': 
     {
-         'n_classes': 19,
-         'input_size': (1025, 2049),
+         'n_classes': 3,
+         'input_size': (400, 800),
          'block_config': [3, 4, 6, 3],
     },
 }
@@ -32,9 +32,9 @@ class icnet(nn.Module):
     """
 
     def __init__(self, 
-                 n_classes=19, 
+                 n_classes=3, 
                  block_config=[3, 4, 6, 3], 
-                 input_size=(1025, 2049), 
+                 input_size=(400, 800), 
                  version=None,
                  with_bn=True):
 
@@ -88,45 +88,39 @@ class icnet(nn.Module):
 
     def forward(self, x):
         h, w = x.shape[2:]
-
+        
         # H, W -> H/2, W/2
         x_sub2 = interp(x, output_size=get_interp_size(x, s_factor=2))
-
         # H/2, W/2 -> H/4, W/4
         x_sub2 = self.convbnrelu1_1(x_sub2)
         x_sub2 = self.convbnrelu1_2(x_sub2)
         x_sub2 = self.convbnrelu1_3(x_sub2)
-
         # H/4, W/4 -> H/8, W/8
         x_sub2 = F.max_pool2d(x_sub2, 3, 2, 1)
-
         # H/8, W/8 -> H/16, W/16
         x_sub2 = self.res_block2(x_sub2)
         x_sub2 = self.res_block3_conv(x_sub2)
         # H/16, W/16 -> H/32, W/32
         x_sub4 = interp(x_sub2, output_size=get_interp_size(x_sub2, s_factor=2))
         x_sub4 = self.res_block3_identity(x_sub4)
-
         x_sub4 = self.res_block4(x_sub4)
         x_sub4 = self.res_block5(x_sub4)
-
         x_sub4 = self.pyramid_pooling(x_sub4)
         x_sub4 = self.conv5_4_k1(x_sub4)
 
         x_sub1 = self.convbnrelu1_sub1(x)
         x_sub1 = self.convbnrelu2_sub1(x_sub1)
         x_sub1 = self.convbnrelu3_sub1(x_sub1)
-
         x_sub24, sub4_cls = self.cff_sub24(x_sub4, x_sub2)
         x_sub12, sub24_cls = self.cff_sub12(x_sub24, x_sub1)
 
-        x_sub12 = F.upsample(x_sub12, size=get_interp_size(x_sub12, z_factor=2), mode='bilinear')
+        x_sub12 = F.upsample(x_sub12, size=np.array(x_sub12.size()[-2:])*2, mode='bilinear')
         sub124_cls = self.classification(x_sub12)
 
         if self.training:
             return sub4_cls, sub24_cls, sub124_cls
         else: # eval mode
-            sub124_cls = F.upsample(sub124_cls, size=get_interp_size(sub124_cls, z_factor=4), mode='bilinear') # Test only
+            sub124_cls = F.upsample(sub124_cls, size=np.array(sub124_cls.size()[-2:])*4, mode='bilinear') # Test only
             return sub124_cls
 
     def load_pretrained_model(self, model_path):
@@ -288,9 +282,10 @@ class icnet(nn.Module):
             _transfer_conv_bn(k, v)
 
         # Transfer weights for final non-bn conv layer
-        _transfer_conv('conv6_cls', self.classification)
-        _transfer_conv('conv6_sub4', self.cff_sub24.low_classifier_conv)
-        _transfer_conv('conv6_sub2', self.cff_sub12.low_classifier_conv)
+        # Take these out for carla dataset
+        #_transfer_conv('conv6_cls', self.classification)
+        #_transfer_conv('conv6_sub4', self.cff_sub24.low_classifier_conv)
+        #_transfer_conv('conv6_sub2', self.cff_sub12.low_classifier_conv)
 
         # Transfer weights for all residual layers
         for k, v in residual_layers.items():

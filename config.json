@@ -37,5 +37,10 @@
   "cityscapes":
   {
     "data_path": "/home/dannyhung/LightNet/datasets/cityscapes/"
+  },
+
+  "carla":
+  {
+    "data_path": "/home/dannyhung/pytorch-semseg/carla/"
   }
 }

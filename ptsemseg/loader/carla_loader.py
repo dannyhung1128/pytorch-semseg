@@ -110,7 +110,9 @@ class carlaLoader(data.Dataset):
         if not np.all(np.unique(lbl[lbl!=self.ignore_index]) < self.n_classes):
             print('after det', classes,  np.unique(lbl))
             raise ValueError("Segmentation map contained invalid class values")
-
+        img = img[:, 43:-17, :]
+        lbl = lbl[43:-17, :]
+    
         img = torch.from_numpy(img).float()
         lbl = torch.from_numpy(lbl).long()
 

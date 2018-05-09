@@ -51,12 +51,29 @@ def train(args):
 
     # Setup Model
     model = get_model(args.arch, n_classes)
-    #caffemodel_dir_path = '/home/dannyhung/pytorch-semseg/'
-    #model.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_cityscapes.caffemodel'))
-    model_path = 'pspnet_cityscapes_best_model.pkl'
-    state = convert_state_dict(torch.load(model_path)['model_state'])
-    model.load_state_dict(state)     
-   
+    
+    if args.arch == 'pspnet':
+        if args.dataset == 'cityscapes':
+            model_path = 'pspnet_cityscapes_30_best_model.pkl'
+            state = convert_state_dict(torch.load(model_path)['model_state'])
+            model.load_state_dict(state)
+            print("Loading model from ", model_path)
+            #caffemodel_dir_path = '/home/dannyhung/pytorch-semseg/'
+            #model.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_cityscapes.caffemodel'))
+        elif args.dataset == 'carla':
+            model_path = 'pspnet_cityscapes_30_best_model.pkl'
+            state = convert_state_dict(torch.load(model_path)['model_state'])
+            model.load_state_dict(state)     
+            print("Loading model from ", model_path)
+    elif args.arch == 'deeplabv3plus':
+        state_dict = torch.load('/home/dannyhung/deeplab-pytorch/data/models/deeplab_resnet101/coco_init/deeplabv3plus_resnet101_COCO_init.pth')
+        model.load_state_dict(state_dict, strict=False)   
+    elif args.arch == 'icnet':
+        state_dict = convert_state_dict(torch.load('/home/dannyhung/pytorch-semseg/icnet_cityscapes_9_best_model.pkl'))
+        model.load_state_dict(state_dict, strict=False)
+        #caffemodel_dir_path = 'checkpoints/icnet_cityscapes_trainval_90k.caffemodel'
+        #model.load_pretrained_model(model_path=caffemodel_dir_path)
+
     model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
     model.cuda()
     
@@ -87,6 +104,8 @@ def train(args):
     for epoch in range(args.n_epoch):
         model.train()
         for i, (images, labels) in enumerate(trainloader):
+#            print(images.shape, labels.shape)   
+#           if i == 2: break
             if len(images) == 1:
                 images = torch.cat((images, images), 0)
                 labels = torch.cat((labels, labels), 0)
@@ -97,7 +116,6 @@ def train(args):
             optimizer.zero_grad()
             outputs = model(images)
             forward_time = time.time() - start
-            
             start = time.time()
             loss = loss_fn(input=outputs, target=labels)
             loss.backward()
@@ -118,8 +136,8 @@ def train(args):
         for i_val, (images_val, labels_val) in tqdm(enumerate(valloader)):
             images_val = Variable(images_val.cuda(), volatile=True)
             labels_val = Variable(labels_val.cuda(), volatile=True)
-
             outputs = model(images_val)
+    #        print(outputs.shape)
             pred = outputs.data.max(1)[1].cpu().numpy()
             gt = labels_val.data.cpu().numpy()
             running_metrics.update(gt, pred)

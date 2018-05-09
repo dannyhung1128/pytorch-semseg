@@ -82,7 +82,10 @@ class cityscapesLoader(data.Dataset):
 
         self.ignore_index = 250
         self.class_map = dict(zip(self.valid_classes, range(3))) 
-
+        self.n_pad = int(self.img_size[1] * 0.75 - self.img_size[0])
+        self.l_bound = int(self.n_pad * 29 / 80)
+        self.padding = np.zeros((3, self.n_pad, self.img_size[1]))
+        self.padding_lbl = np.ones((self.n_pad, self.img_size[1])) * 250
         if not self.files[split]:
             raise Exception("No files for split=[%s] found in %s" % (split, self.images_base))
 
@@ -113,7 +116,6 @@ class cityscapesLoader(data.Dataset):
         
         if self.is_transform:
             img, lbl = self.transform(img, lbl)
-
         return img, lbl
 
     def transform(self, img, lbl):
@@ -138,13 +140,18 @@ class cityscapesLoader(data.Dataset):
         lbl = m.imresize(lbl, (self.img_size[0], self.img_size[1]), 'nearest', mode='F')
         lbl = lbl.astype(int)
 
-        if not np.all(classes == np.unique(lbl)):
-            print("WARN: resizing labels yielded fewer classes")
+        #if not np.all(classes == np.unique(lbl)):
+        #    print("WARN: resizing labels yielded fewer classes")
 
         if not np.all(np.unique(lbl[lbl!=self.ignore_index]) < self.n_classes):
             print('after det', classes,  np.unique(lbl))
             raise ValueError("Segmentation map contained invalid class values")
-
+        img = np.concatenate((self.padding[:, self.l_bound:, :], img, self.padding[:, :self.l_bound, :]), axis=1)
+        lbl = np.concatenate((self.padding_lbl[self.l_bound:], lbl, self.padding_lbl[:self.l_bound]), axis=0)
+        
+        img = img[:, 62:-22 ,:]
+        lbl = lbl[62:-22, :]
+        
         img = torch.from_numpy(img).float()
         lbl = torch.from_numpy(lbl).long()
 

@@ -12,6 +12,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from resnet import _ConvBatchNormReLU, _ResBlock, _ResBlockMG
+from mobilenetv2 import MobileNetV2
+from torch.nn import Parameter
 
 
 class _ASPPModule(nn.Module):
@@ -50,37 +52,35 @@ class DeepLabV3(nn.Sequential):
 
     def __init__(self, n_classes, n_blocks, pyramids, multi_grid=[1, 2, 1]):
         super(DeepLabV3, self).__init__()
-        self.add_module(
-            'layer1',
-            nn.Sequential(
-                OrderedDict([
-                    ('conv1', _ConvBatchNormReLU(3, 64, 7, 2, 3, 1)),
-                    ('pool', nn.MaxPool2d(3, 2, 1, ceil_mode=True)),
-                ])
-            )
-        )
-        self.add_module('layer2', _ResBlock(n_blocks[0], 64, 64, 256, 1, 1))  # output_stride=4
-        self.add_module('layer3', _ResBlock(n_blocks[1], 256, 128, 512, 2, 1))  # output_stride=8
-        self.add_module('layer4', _ResBlock(n_blocks[2], 512, 256, 1024, 1, 2))  # output_stride=8
-        self.add_module('layer5', _ResBlockMG(n_blocks[3], 1024, 512, 2048, 1, 2, mg=multi_grid))
-        self.add_module('aspp', _ASPPModule(2048, 256, pyramids))
+       
+        self.mobilenetv2 = MobileNetV2()
+        self.add_module('aspp', _ASPPModule(1280, 256, pyramids))
         self.add_module('fc1', _ConvBatchNormReLU(256 * (len(pyramids) + 2), 256, 1, 1, 0, 1))
         self.add_module('fc2', nn.Conv2d(256, n_classes, kernel_size=1))
 
     def forward(self, x):
-        return super(DeepLabV3, self).forward(x)
-
-    def freeze_bn(self):
-        for m in self.named_modules():
-            if 'layer' in m[0]:
-                if isinstance(m[1], nn.BatchNorm2d):
-                    print m[0]
-                    m[1].eval()
-
+        x = self.mobilenetv2(x)
+        x = self.aspp(x)
+        x = self.fc1(x)
+        x = self.fc2(x)
+        return x 
+    
+    def loadMobileNetv2(self, path='../../mobilenetv2_718.pth.tar'):
+        state_dict = torch.load(path)
+        self.mobilenetv2.load_state_dict(state_dict)
+    
+    def load_pretrained_model(self, path='deeplabv3_cityscapes_24_best_model.pkl'):
+        state_dict = torch.load(path)['model_state']
+        for name, param in state_dict.items():
+            if name[13:] not in self.state_dict().keys():
+                continue
+            if isinstance(param, Parameter):
+                param = param.data
+            print(name)
+            self.state_dict()[name[13:]].copy_(param)
 
 if __name__ == '__main__':
-    model = DeepLabV3(n_classes=21, n_blocks=[3, 4, 23, 3], pyramids=[6, 12, 18])
-    model.freeze_bn()
+    model = DeepLabV3(n_classes=3, n_blocks=[3, 4, 23, 3], pyramids=[6, 12, 18])
     model.eval()
     print list(model.named_children())
     image = torch.autograd.Variable(torch.randn(1, 3, 513, 513), volatile=True)

@@ -20,6 +20,7 @@ from ptsemseg.loader import get_loader, get_data_path
 from ptsemseg.metrics import runningScore
 from ptsemseg.utils import convert_state_dict
 from collections import Counter
+import scipy.misc as m
 torch.backends.cudnn.benchmark = True
 
 cudnn.benchmark = True
@@ -38,18 +39,25 @@ def validate(args):
     # Setup Dataloader
     data_loader = get_loader(args.dataset)
     data_path = get_data_path(args.dataset)
-    loader = data_loader(data_path, split=args.split, is_transform=True, img_size=(args.img_rows, args.img_cols), img_norm=args.img_norm)
+    loader = data_loader(data_path, split=args.split, is_transform=True, img_size=(args.img_rows, args.img_cols), img_norm=args.img_norm, arch=model_name)
     n_classes = loader.n_classes
     valloader = data.DataLoader(loader, batch_size=args.batch_size, num_workers=4)
     running_metrics = runningScore(n_classes)
 
     # Setup Model
     model = get_model(model_name, n_classes, version=args.dataset)
-    state = convert_state_dict(torch.load(args.model_path)['model_state'])
-    model.load_state_dict(state)
+    if model_name == 'pspnet':
+        state = convert_state_dict(torch.load(args.model_path)['model_state'])
+        model.load_state_dict(state)
+    elif model_name == 'deeplabv3':
+        model.scale.mobilenetv2 = torch.nn.DataParallel(model.scale.mobilenetv2).cuda()
+        #state_dict = torch.load('deeplabv3_cityscapes_24_best_model.pkl')['model_state']
+        model.scale.load_pretrained_model(args.model_path)
+        #model.scale.loadMobileNetv2('mobilenetv2_718.pth.tar')
+        print('mobilenetV2 loaded')
     model.eval()
     model.cuda()
-
+    total_time = 0.
     for i, (images, labels) in enumerate(valloader):
         start_time = timeit.default_timer()
 
@@ -77,7 +85,16 @@ def validate(args):
         if args.measure_time:
             elapsed_time = timeit.default_timer() - start_time
             print('Inference time (iter {0:5d}): {1:3.5f} fps'.format(i+1, pred.shape[0]/elapsed_time))
+        total_time += pred.shape[0]/elapsed_time
         running_metrics.update(gt, pred)
+        #for j in range(len(pred)):        
+        #    img = pred[j]
+        #    #idx = i * args.batch_size + j
+        #    img[img == 1] = 100
+        #    img[img == 2] = 200
+        #    print(idx, img.shape)
+        #    m.imsave('save/%s.png' % idx, img)
+
 
     score, class_iou = running_metrics.get_scores()
 
@@ -86,7 +103,7 @@ def validate(args):
 
     for i in range(n_classes):
         print(i, class_iou[i])
-
+    print(total_time / len(valloader))
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Hyperparams')
     parser.add_argument('--model_path', nargs='?', type=str, default='fcn8s_pascal_1_26.pkl', 

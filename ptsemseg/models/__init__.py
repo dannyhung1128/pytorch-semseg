@@ -10,7 +10,9 @@ from ptsemseg.models.frrn import *
 from ptsemseg.models.deeplabv3plus import *
 from ptsemseg.models.resnet import *
 from ptsemseg.models.msc import *
-
+from ptsemseg.models.pspnetXception import pspnetXception
+from ptsemseg.models.nasnet import *
+from ptsemseg.models.deeplabv3 import *
 
 def get_model(name, n_classes, version=None):
     model = _get_model_instance(name)
@@ -46,6 +48,13 @@ def get_model(name, n_classes, version=None):
     elif name == 'deeplabv3plus':
         return MSC(DeepLabV3Plus(n_classes=n_classes, n_blocks=[3, 4, 23, 3], pyramids=[6, 12, 18]))
     
+    elif name == 'pspnetXception':
+        return model(n_classes=n_classes, version=version)
+
+    elif name == 'nasnet':
+        return model(n_classes=n_classes, version=version)
+    elif name == 'deeplabv3':
+        return MSC(DeepLabV3(n_classes=n_classes, n_blocks=[3, 4, 23, 3], pyramids=[6, 12, 18]))
     else:
         model = model(n_classes=n_classes)
 
@@ -66,6 +75,9 @@ def _get_model_instance(name):
             'frrnA': frrn,
             'frrnB': frrn,
             'deeplabv3plus': deeplabv3plus,
+            'pspnetXception': pspnetXception,
+            'nasnet': nasnet,
+            'deeplabv3': DeepLabV3,
         }[name]
     except:
         print('Model {} not available'.format(name))

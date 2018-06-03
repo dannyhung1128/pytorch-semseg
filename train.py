@@ -16,8 +16,10 @@ from ptsemseg.models import get_model
 from ptsemseg.loader import get_loader, get_data_path
 from ptsemseg.metrics import runningScore
 from ptsemseg.loss import *
+from ptsemseg.lovasz import *
 from ptsemseg.augmentations import *
 from ptsemseg.utils import convert_state_dict
+from ptsemseg.models.pspnetXception import get_pretrained_model
 
 def train(args):
 
@@ -29,12 +31,15 @@ def train(args):
     data_loader = get_loader(args.dataset)
     data_path = get_data_path(args.dataset)
     t_loader = data_loader(data_path, is_transform=True, img_size=(args.img_rows, args.img_cols), augmentations=data_aug, img_norm=args.img_norm)
-    v_loader = data_loader(data_path, is_transform=True, split='val', img_size=(args.img_rows, args.img_cols), img_norm=args.img_norm)
+    if args.dataset == 'carla':
+        v_loader = data_loader(data_path, is_transform=True, split='train', img_size=(args.img_rows, args.img_cols), img_norm=args.img_norm)
+    else:
+        v_loader = data_loader(data_path, is_transform=True, split='val', img_size=(args.img_rows, args.img_cols), img_norm=args.img_norm)
 
     n_classes = t_loader.n_classes
     trainloader = data.DataLoader(t_loader, batch_size=args.batch_size, num_workers=8, shuffle=True)
     valloader = data.DataLoader(v_loader, batch_size=args.batch_size, num_workers=8)
-
+    print(len(trainloader))
     # Setup Metrics
     running_metrics = runningScore(n_classes)
         
@@ -54,25 +59,44 @@ def train(args):
     
     if args.arch == 'pspnet':
         if args.dataset == 'cityscapes':
-            model_path = 'pspnet_cityscapes_30_best_model.pkl'
-            state = convert_state_dict(torch.load(model_path)['model_state'])
-            model.load_state_dict(state)
+            model_path = 'checkpoints/pspnet_180x240_carla_best_model.pkl'
+            model.load_pretrained_model(model_path)
+            #model_path = 'pspnet_cityscapes_27_best_model.pkl'
+            #state = convert_state_dict(torch.load(model_path)['model_state'])
+            #model.load_state_dict(state)
             print("Loading model from ", model_path)
             #caffemodel_dir_path = '/home/dannyhung/pytorch-semseg/'
             #model.load_pretrained_model(model_path=os.path.join(caffemodel_dir_path, 'pspnet101_cityscapes.caffemodel'))
         elif args.dataset == 'carla':
-            model_path = 'pspnet_cityscapes_30_best_model.pkl'
+            model_path = 'pspnet_carla_8_best_model.pkl'
             state = convert_state_dict(torch.load(model_path)['model_state'])
             model.load_state_dict(state)     
             print("Loading model from ", model_path)
     elif args.arch == 'deeplabv3plus':
-        state_dict = torch.load('/home/dannyhung/deeplab-pytorch/data/models/deeplab_resnet101/coco_init/deeplabv3plus_resnet101_COCO_init.pth')
+        #state_dict = torch.load('/home/dannyhung/deeplab-pytorch/data/models/deeplab_resnet101/coco_init/deeplabv3plus_resnet101_COCO_init.pth')
+        state_dict = convert_state_dict(torch.load('deeplabv3plus_cityscapes_20_best_model.pkl'))
         model.load_state_dict(state_dict, strict=False)   
     elif args.arch == 'icnet':
         state_dict = convert_state_dict(torch.load('/home/dannyhung/pytorch-semseg/icnet_cityscapes_9_best_model.pkl'))
         model.load_state_dict(state_dict, strict=False)
         #caffemodel_dir_path = 'checkpoints/icnet_cityscapes_trainval_90k.caffemodel'
         #model.load_pretrained_model(model_path=caffemodel_dir_path)
+    elif args.arch == 'pspnetXception':
+        model = get_pretrained_model()
+        #state_dict = convert_state_dict(torch.load('pspnetXception_cityscapes_20_best_model.pkl'))
+        #model.load_state_dict(state_dict)
+        print("Loading pretrained model")
+    elif args.arch == 'nasnet':
+        model.load_pretrained_model('nasnet_cityscapes_29_best_model.pkl')
+        #state_dict = convert_state_dict(torch.load('nasnet_cityscapes_21_best_model.pkl'))
+        #model.load_state_dict(state_dict)        
+        print("NASNET loaded")
+    elif args.arch == 'deeplabv3':
+        model.scale.mobilenetv2 = torch.nn.DataParallel(model.scale.mobilenetv2).cuda()
+        #state_dict = torch.load('deeplabv3_cityscapes_24_best_model.pkl')['model_state']
+        model.scale.load_pretrained_model('deeplabv3_cityscapes_28_best_model.pkl')
+        #model.scale.loadMobileNetv2('mobilenetv2_718.pth.tar')
+        print('mobilenetV2 loaded')
 
     model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
     model.cuda()
@@ -88,6 +112,10 @@ def train(args):
         loss_fn = model.module.loss
     else:
         loss_fn = cross_entropy2d
+    if args.loss == 'lovasz':
+        print("Using Lovasz loss")
+    loss_fn_1 = model.module.loss
+    loss_fn_2 = multi_scale_lovasz
 
     if args.resume is not None:                                         
         if os.path.isfile(args.resume):
@@ -104,7 +132,7 @@ def train(args):
     for epoch in range(args.n_epoch):
         model.train()
         for i, (images, labels) in enumerate(trainloader):
-#            print(images.shape, labels.shape)   
+#           print(images.shape, labels.shape)   
 #           if i == 2: break
             if len(images) == 1:
                 images = torch.cat((images, images), 0)
@@ -115,9 +143,12 @@ def train(args):
             
             optimizer.zero_grad()
             outputs = model(images)
+#            for i in range(len(outputs)):
+#                print(outputs[i].shape)
             forward_time = time.time() - start
             start = time.time()
-            loss = loss_fn(input=outputs, target=labels)
+            loss = loss_fn_1(input=outputs, target=labels)
+            loss+= loss_fn_2(outputs, labels, ignore=250)
             loss.backward()
             optimizer.step()
             backprop_time = time.time() - start
@@ -186,6 +217,8 @@ if __name__ == '__main__':
                         help='Enable visualization(s) on visdom | False by default')
     parser.add_argument('--no-visdom', dest='visdom', action='store_false', 
                         help='Disable visualization(s) on visdom | False by default')
+    parser.add_argument('--loss', type=str, default='multi_ce',
+                        help='Losvasz Loss or multiclass cross entropy')
     parser.set_defaults(visdom=False)
 
     args = parser.parse_args()

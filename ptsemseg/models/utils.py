@@ -362,7 +362,8 @@ class pyramidPooling(nn.Module):
 
         self.paths = []
         for i in range(len(pool_sizes)):
-            self.paths.append(conv2DBatchNormRelu(in_channels, int(in_channels / len(pool_sizes)), 1, 1, 0, bias=bias, with_bn=with_bn))
+            #print(int(in_channels / (2*len(pool_sizes))))
+            self.paths.append(conv2DBatchNormRelu(in_channels, int(in_channels / (len(pool_sizes))), 1, 1, 0, bias=bias, with_bn=with_bn))
 
         self.path_module_list = nn.ModuleList(self.paths)
         self.pool_sizes = pool_sizes
@@ -381,7 +382,6 @@ class pyramidPooling(nn.Module):
         else: # eval mode and icnet: pre-trained for 1025 x 2049
             k_sizes = [(8, 15), (13, 25), (17, 33), (33, 65)]
             strides = [(5, 10), (10, 20), (16, 32), (33, 65)]
-
         if self.fusion_mode == 'cat': # pspnet: concat (including x)
             output_slices = [x]
 

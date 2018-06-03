@@ -12,6 +12,8 @@ from ptsemseg import caffe_pb2
 from ptsemseg.models.utils import *
 from ptsemseg.loss import *
 from ptsemseg.utils import convert_state_dict
+from torch.nn import Parameter
+
 
 pspnet_specs = {
     'pascalvoc': 
@@ -85,13 +87,13 @@ class pspnet(nn.Module):
         
         # Dilated Residual Blocks
         self.res_block4 = residualBlockPSP(self.block_config[2], 512, 256, 1024, 1, 2)
-        self.res_block5 = residualBlockPSP(self.block_config[3], 1024, 512, 2048, 1, 4)
+        self.res_block5 = residualBlockPSP(self.block_config[3], 1024, 512, 1024, 1, 4)
         
         # Pyramid Pooling Module
-        self.pyramid_pooling = pyramidPooling(2048, [6, 3, 2, 1])
+        self.pyramid_pooling = pyramidPooling(1024, [6, 3, 2, 1])
        
-        # Final conv layers
-        self.cbr_final = conv2DBatchNormRelu(4096, 512, 3, 1, 1, False)
+        # Final conv layers # 4096->2048
+        self.cbr_final = conv2DBatchNormRelu(2048, 512, 3, 1, 1, False)
         self.dropout = nn.Dropout2d(p=0.1, inplace=True)
         self.classification = nn.Conv2d(512, self.n_classes, 1, 1, 0)
 
@@ -117,16 +119,13 @@ class pspnet(nn.Module):
         x = self.res_block2(x)
         x = self.res_block3(x)
         x = self.res_block4(x)
-
         # Auxiliary layers for training
         x_aux = self.convbnrelu4_aux(x)
         x_aux = self.dropout(x_aux)
         x_aux = self.aux_cls(x_aux)
 
         x = self.res_block5(x)
-
         x = self.pyramid_pooling(x)
-
         x = self.cbr_final(x)
         x = self.dropout(x)
 
@@ -137,8 +136,18 @@ class pspnet(nn.Module):
             return x_aux, x
         else: # eval mode
             return x
+    def load_pretrained_model(self, path):
+        own_state = self.state_dict()
+        state_dict = torch.load(path)['model_state']
+        for n, p in state_dict.items():
+            if n[7:] not in own_state.keys() or 'cbr_final' in n or 'res_block5' in n or 'pyramid' in n:
+                continue
+            print(n)
+            if isinstance(p, Parameter):
+                p = p.data
+            own_state[n[7:]].copy_(p)
 
-    def load_pretrained_model(self, model_path):
+    def load_init_model(self, model_path):
         """
         Load weights from caffemodel w/o caffe dependency
         and plug them in corresponding modules

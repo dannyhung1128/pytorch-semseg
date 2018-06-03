@@ -14,10 +14,10 @@ class carlaLoader(data.Dataset):
 
     label_colours = dict(zip(range(3), colors))
 
-    mean_rgb = {'carla': [92.05991654, 84.79349942, 77.08157727]} # pascal mean for PSPNet and ICNet pre-trained model
+    mean_rgb = {'carla': [70.9061883, 64.42439365, 58.9598018]} # pascal mean for PSPNet and ICNet pre-trained model
 
     def __init__(self, root, split="train", is_transform=False, 
-                 img_size=(600, 800), augmentations=None, img_norm=True, version='carla'):
+                 img_size=(600, 800), augmentations=None, img_norm=True, version='carla', arch='pspnet'):
         """__init__
 
         :param root:
@@ -32,6 +32,7 @@ class carlaLoader(data.Dataset):
         self.augmentations = augmentations
         self.img_norm = img_norm
         self.n_classes = 3
+        self.arch = arch
         self.img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
         self.mean = np.array(self.mean_rgb[version])
         self.files = {}
@@ -80,7 +81,7 @@ class carlaLoader(data.Dataset):
         if self.is_transform:
             img, lbl = self.transform(img, lbl)
 
-        return img, lbl
+        return img, lbl#, img_path.split("/")[-1].split(".")[0]
 
     def transform(self, img, lbl):
         """transform
@@ -89,7 +90,6 @@ class carlaLoader(data.Dataset):
         :param lbl:
         """
         img = m.imresize(img, (self.img_size[0], self.img_size[1])) # uint8 with RGB mode
-        img = img[:, :, ::-1] # RGB -> BGR
         img = img.astype(np.float64)
         img -= self.mean
         if self.img_norm:
@@ -110,9 +110,18 @@ class carlaLoader(data.Dataset):
         if not np.all(np.unique(lbl[lbl!=self.ignore_index]) < self.n_classes):
             print('after det', classes,  np.unique(lbl))
             raise ValueError("Segmentation map contained invalid class values")
-        img = img[:, 43:-17, :]
-        lbl = lbl[43:-17, :]
+        if self.arch == 'deeplabv3':
+            img = img[:, 106:-38, :]
+            lbl = lbl[106:-38, :]    
     
+        #img = img[:, 43:-17, :]
+        #lbl = lbl[43:-17, :]
+        elif self.arch == 'pspnet':
+            #img = img[:, 43:-17, :]
+            #lbl = lbl[43:-17, :]
+            img = img[:, 62:-22 ,:]
+            lbl = lbl[62:-22, :]
+
         img = torch.from_numpy(img).float()
         lbl = torch.from_numpy(lbl).long()
 

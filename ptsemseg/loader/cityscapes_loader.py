@@ -43,10 +43,10 @@ class cityscapesLoader(data.Dataset):
 
     label_colours = dict(zip(range(3), colors))
 
-    mean_rgb = {'pascal': [103.939, 116.779, 123.68], 'cityscapes': [73.15835921, 82.90891754, 72.39239876]} # pascal mean for PSPNet and ICNet pre-trained model
+    mean_rgb = {'pascal': [103.939, 116.779, 123.68], 'cityscapes': [66.63619917, 76.12220271, 65.74310554]}#[73.15835921, 82.90891754, 72.39239876]} # pascal mean for PSPNet and ICNet pre-trained model
 
     def __init__(self, root, split="train", is_transform=False, 
-                 img_size=(512, 1024), augmentations=None, img_norm=True, version='pascal'):
+                 img_size=(512, 1024), augmentations=None, img_norm=True, version='cityscapes', arch='pspnet'):
         """__init__
 
         :param root:
@@ -61,8 +61,9 @@ class cityscapesLoader(data.Dataset):
         self.augmentations = augmentations
         self.img_norm = img_norm
         self.n_classes = 3
+        self.arch = arch
         self.img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
-        self.mean = np.array(self.mean_rgb[version])
+        self.mean = np.array(self.mean_rgb['cityscapes'])
         self.files = {}
 
         self.images_base = os.path.join(self.root, 'leftImg8bit', self.split)
@@ -72,6 +73,7 @@ class cityscapesLoader(data.Dataset):
         #self.files[split] = self.files[split][:50]
         self.void_classes = [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30, -1]
         self.bg_classes   = [8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 31, 32, 33]
+#        self.void_classes += [8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 31, 32, 33]
                         
         self.valid_classes = [7, 26, 99] # 26, 27, 28 = vehicle
         self.class_names = ['road', 'vehicle', 'background']
@@ -125,7 +127,7 @@ class cityscapesLoader(data.Dataset):
         :param lbl:
         """
         img = m.imresize(img, (self.img_size[0], self.img_size[1])) # uint8 with RGB mode
-        img = img[:, :, ::-1] # RGB -> BGR
+        #img = img[:, :, ::-1] # RGB -> BGR
         img = img.astype(np.float64)
         img -= self.mean
         if self.img_norm:
@@ -148,10 +150,15 @@ class cityscapesLoader(data.Dataset):
             raise ValueError("Segmentation map contained invalid class values")
         img = np.concatenate((self.padding[:, self.l_bound:, :], img, self.padding[:, :self.l_bound, :]), axis=1)
         lbl = np.concatenate((self.padding_lbl[self.l_bound:], lbl, self.padding_lbl[:self.l_bound]), axis=0)
-        
-        img = img[:, 62:-22 ,:]
-        lbl = lbl[62:-22, :]
-        
+        if self.arch == 'pspnet':      
+            img = img[:, 62:-22 ,:]
+            lbl = lbl[62:-22, :]
+        #img = img[:, 74:-38 ,:]
+        #lbl = lbl[74:-38, :]        
+        # deeplab 224x448
+        elif self.arch == 'deeplabv3':
+            img = img[:, 106:-38, :]
+            lbl = lbl[106:-38, :]
         img = torch.from_numpy(img).float()
         lbl = torch.from_numpy(lbl).long()
 
